@@ -27,6 +27,15 @@ object NovelScraper {
         }
     }
 
+    /**
+     * なろうのURLからホスト名をそのまま取り出す（ncode.syosetu.com / novel18.syosetu.com 等）。
+     * R18作品はnovel18.syosetu.com側でしか閲覧できず、ncode.syosetu.com側だと年齢確認ページに
+     * リダイレクトされてしまうため、以降のエピソードURLを組み立てる際も常に「渡されたURLと
+     * 同じホスト」を使い続ける必要がある（年齢確認突破後のCookieもホスト単位で紐づくため）。
+     */
+    fun extractNarouHost(url: String): String =
+        Regex("([a-zA-Z0-9.-]+\\.syosetu\\.com)").find(url)?.groupValues?.get(1) ?: "ncode.syosetu.com"
+
     fun parseWorkMeta(html: String, workUrl: String, site: Site): WorkMeta {
         val doc = Jsoup.parse(html, workUrl)
         val title = extractTitleFromHead(doc)
@@ -39,7 +48,7 @@ object NovelScraper {
             }
             Site.NAROU -> {
                 val ncode = extractWorkId(workUrl, site)
-                "https://ncode.syosetu.com/$ncode/1/"
+                "https://${extractNarouHost(workUrl)}/$ncode/1/"
             }
             Site.UNKNOWN -> null
         }
@@ -172,7 +181,7 @@ object NovelScraper {
                 if (m != null) {
                     val ncode = m.groupValues[1]
                     val num = m.groupValues[2].toInt()
-                    "https://ncode.syosetu.com/$ncode/${num + 1}/"
+                    "https://${extractNarouHost(currentUrl)}/$ncode/${num + 1}/"
                 } else null
             }
             Site.UNKNOWN -> null

@@ -82,11 +82,12 @@ class DownloadManager(private val storage: Storage) {
         onProgress: suspend (Progress) -> Unit
     ) {
         val ncode = NovelScraper.extractWorkId(workUrl, Site.NAROU)
+        val host = NovelScraper.extractNarouHost(workUrl)
         var savedCount = savedCountStart
         var refererUrl = workUrl
 
         for (order in startOrder..totalEpisodes) {
-            val episodeUrl = "https://ncode.syosetu.com/$ncode/$order/"
+            val episodeUrl = "https://$host/$ncode/$order/"
 
             val html = try {
                 NetworkClient.fetchHtml(episodeUrl, referer = refererUrl)
