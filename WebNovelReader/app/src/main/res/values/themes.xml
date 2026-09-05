@@ -6,7 +6,7 @@
     -->
     <style name="Theme.NovelReader" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="android:windowBackground">@color/app_background</item>
-        <item name="colorBackground">@color/app_background</item>
+        <item name="android:colorBackground">@color/app_background</item>
         <item name="android:textColorPrimary">@color/app_text_primary</item>
         <item name="android:textColorSecondary">@color/app_text_secondary</item>
         <item name="android:textColor">@color/app_text_primary</item>
