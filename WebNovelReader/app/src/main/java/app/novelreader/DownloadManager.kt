@@ -48,7 +48,7 @@ class DownloadManager(private val storage: Storage) {
         }
 
         val meta = NovelScraper.parseWorkMeta(workHtml, url, site)
-        val totalEpisodes = NovelScraper.extractTotalEpisodes(workHtml, site)
+        val totalEpisodes = NovelScraper.extractTotalEpisodes(workHtml, url, site)
         val chapterMap = NovelScraper.parseChapterMap(workHtml, url, site)
         val novel = Novel(
             id = novelId,

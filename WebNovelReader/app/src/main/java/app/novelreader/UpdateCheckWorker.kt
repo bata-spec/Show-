@@ -45,7 +45,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
 
         val existingEpisodes = storage.loadEpisodes(novel.id)
         val existingCount = existingEpisodes.count { it.downloaded }
-        val totalNow = NovelScraper.extractTotalEpisodes(workHtml, novel.site)
+        val totalNow = NovelScraper.extractTotalEpisodes(workHtml, novel.sourceUrl, novel.site)
 
         val hasNew = if (totalNow != null) {
             totalNow > existingCount

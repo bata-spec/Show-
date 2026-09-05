@@ -54,11 +54,18 @@ object NovelScraper {
 
     /**
      * 作品ページから総話数を読み取る（分かる場合のみ）。
-     * なろうは「全600エピソード」のような表記があるため高精度に取れる。
-     * カクヨムは表記が無い場合も多いのでベストエフォート。
+     * なろうの場合は、まずページ内にある「この作品自身」のエピソードリンクだけを数え、
+     * 見つかった最大の話数を総話数とする（自分のncodeへのリンクだけに絞ることで、
+     * おすすめ作品・ランキング等に表示された無関係な他作品の「全◯◯話」表記を
+     * 誤って拾わないようにする）。それでも見つからない場合のみ、
+     * ページ全体のテキストから「全◯◯話」のような表記を探すフォールバックを使う
+     * （ベストエフォートで、無関係な文言を拾う可能性が残る）。
      */
-    fun extractTotalEpisodes(html: String, site: Site): Int? {
-        val text = Jsoup.parse(html).text()
+    fun extractTotalEpisodes(html: String, workUrl: String, site: Site): Int? {
+        val doc = Jsoup.parse(html, workUrl)
+        tocMaxEpisodeNumber(doc, workUrl, site)?.let { return it }
+
+        val text = doc.text()
         val patterns = when (site) {
             Site.NAROU -> listOf(Regex("全\\s*(\\d+)\\s*エピソード"), Regex("全\\s*(\\d+)\\s*話"))
             Site.KAKUYOMU -> listOf(Regex("全\\s*(\\d+)\\s*話"), Regex("全\\s*(\\d+)\\s*エピソード"))
@@ -69,6 +76,28 @@ object NovelScraper {
             if (m != null) return m.groupValues[1].toIntOrNull()
         }
         return null
+    }
+
+    /** ページ内にある「この作品自身」のエピソードリンクの中で最大の話数を返す（なろうのみ対応） */
+    private fun tocMaxEpisodeNumber(doc: Document, workUrl: String, site: Site): Int? {
+        if (site != Site.NAROU) return null
+        val pattern = episodeUrlPatternForWork(workUrl, site) ?: return null
+        return doc.select("a[href]")
+            .mapNotNull { pattern.find(it.attr("abs:href"))?.groupValues?.get(1)?.toIntOrNull() }
+            .maxOrNull()
+    }
+
+    /**
+     * この作品自身のエピソードURLにだけマッチする正規表現を組み立てる
+     * （なろうはncode、カクヨムは作品IDをそれぞれ固定して、他作品へのリンクを除外するため）。
+     */
+    private fun episodeUrlPatternForWork(workUrl: String, site: Site): Regex? {
+        val id = extractWorkId(workUrl, site)
+        return when (site) {
+            Site.NAROU -> Regex("syosetu\\.com/${Regex.escape(id)}/(\\d+)/?(?:[?#].*)?$")
+            Site.KAKUYOMU -> Regex("/works/${Regex.escape(id)}/episodes/\\d+/?$")
+            Site.UNKNOWN -> null
+        }
     }
 
     /**
@@ -84,11 +113,8 @@ object NovelScraper {
     fun parseChapterMap(html: String, workUrl: String, site: Site): Map<String, String> {
         if (site == Site.UNKNOWN) return emptyMap()
         val doc = Jsoup.parse(html, workUrl)
-        val episodeUrlPattern = when (site) {
-            Site.NAROU -> Regex("syosetu\\.com/[a-zA-Z0-9]+/(\\d+)/?(?:[?#].*)?$")
-            Site.KAKUYOMU -> Regex("/works/\\d+/episodes/\\d+/?$")
-            Site.UNKNOWN -> return emptyMap()
-        }
+        // 自分の作品自身のエピソードリンクだけに絞る（おすすめ作品等の無関係なリンクを除外するため）
+        val episodeUrlPattern = episodeUrlPatternForWork(workUrl, site) ?: return emptyMap()
 
         val result = LinkedHashMap<String, String>()
         var currentChapter: String? = null
