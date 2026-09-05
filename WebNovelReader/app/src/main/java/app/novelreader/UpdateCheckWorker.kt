@@ -45,7 +45,10 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
 
         val existingEpisodes = storage.loadEpisodes(novel.id)
         val existingCount = existingEpisodes.count { it.downloaded }
-        val totalNow = NovelScraper.extractTotalEpisodes(workHtml, novel.sourceUrl, novel.site)
+        // 長編は目次が複数ページに分かれるため、1ページ目だけだと既読分より少ない総数に
+        // 見えてしまい、新着があるのに検知できないことがある
+        val tocHtmls = downloadManager.fetchAllTocPages(workHtml, novel.sourceUrl, novel.site)
+        val totalNow = NovelScraper.extractTotalEpisodes(tocHtmls, novel.sourceUrl, novel.site)
 
         val hasNew = if (totalNow != null) {
             totalNow > existingCount

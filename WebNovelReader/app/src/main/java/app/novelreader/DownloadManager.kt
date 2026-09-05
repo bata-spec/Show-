@@ -48,8 +48,11 @@ class DownloadManager(private val storage: Storage) {
         }
 
         val meta = NovelScraper.parseWorkMeta(workHtml, url, site)
-        val totalEpisodes = NovelScraper.extractTotalEpisodes(workHtml, url, site)
-        val chapterMap = NovelScraper.parseChapterMap(workHtml, url, site)
+        // 長編は目次が「次へ」で複数ページに分かれる（なろうは100話区切り等）ため、
+        // 総話数・章立てを取り違えないよう目次の全ページを辿って集計する
+        val tocHtmls = fetchAllTocPages(workHtml, url, site)
+        val totalEpisodes = NovelScraper.extractTotalEpisodes(tocHtmls, url, site)
+        val chapterMap = NovelScraper.parseChapterMap(tocHtmls, url, site)
         val novel = Novel(
             id = novelId,
             title = meta.title,
@@ -69,6 +72,31 @@ class DownloadManager(private val storage: Storage) {
         } else {
             downloadByFollowingLinks(novelId, site, meta, existing, startOrder, totalEpisodes, savedCount, chapterMap, onProgress)
         }
+    }
+
+    /**
+     * 目次ページを「次へ」で辿れるだけ辿り、全ページ分のHTMLを集める。
+     * なろうの長編は100話区切り等で目次が複数ページに分かれるため、1ページ目だけを見ると
+     * 総話数・章立てがそのページの範囲に収まってしまう（例：Tensuraのような数百話の作品）。
+     */
+    suspend fun fetchAllTocPages(firstPageHtml: String, workUrl: String, site: Site): List<String> {
+        val pages = mutableListOf(firstPageHtml)
+        var currentHtml = firstPageHtml
+        var currentUrl = workUrl
+        var guard = 0
+        while (guard < 50) { // 通常ここまで続くことはないが、無限ループを避けるための安全策
+            val nextUrl = NovelScraper.findNextTocPageUrl(currentHtml, currentUrl, site) ?: break
+            val nextHtml = try {
+                NetworkClient.fetchHtml(nextUrl, referer = currentUrl)
+            } catch (e: Exception) {
+                break
+            }
+            pages.add(nextHtml)
+            currentHtml = nextHtml
+            currentUrl = nextUrl
+            guard++
+        }
+        return pages
     }
 
     /** なろう専用：総話数が分かっている場合、番号を直接指定して1話ずつ取得する */

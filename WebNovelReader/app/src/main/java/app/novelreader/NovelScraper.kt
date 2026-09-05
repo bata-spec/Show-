@@ -61,20 +61,29 @@ object NovelScraper {
         return extractTitleFromHead(doc)
     }
 
+    /** 単一ページ版（後方互換用）。目次が複数ページに分かれている作品では正しく数えられないため、
+     *  可能な場合は目次の全ページを渡す [extractTotalEpisodes] (List版) を使うこと。 */
+    fun extractTotalEpisodes(html: String, workUrl: String, site: Site): Int? =
+        extractTotalEpisodes(listOf(html), workUrl, site)
+
     /**
      * 作品ページから総話数を読み取る（分かる場合のみ）。
-     * なろうの場合は、まずページ内にある「この作品自身」のエピソードリンクだけを数え、
+     * なろうの場合は、まず目次の各ページ内にある「この作品自身」のエピソードリンクだけを数え、
      * 見つかった最大の話数を総話数とする（自分のncodeへのリンクだけに絞ることで、
      * おすすめ作品・ランキング等に表示された無関係な他作品の「全◯◯話」表記を
-     * 誤って拾わないようにする）。それでも見つからない場合のみ、
-     * ページ全体のテキストから「全◯◯話」のような表記を探すフォールバックを使う
-     * （ベストエフォートで、無関係な文言を拾う可能性が残る）。
+     * 誤って拾わないようにする）。長編は目次が「次へ」で複数ページに分かれるため、
+     * htmlsには[fetchAllTocPages]等で取得した全ページ分を渡す必要がある
+     * （1ページ目だけだと、そのページに載っている話数が上限になってしまう）。
+     * リンクから求められない場合のみ、ページ全体のテキストから「全◯◯話」のような
+     * 表記を探すフォールバックを使う（ベストエフォートで、無関係な文言を拾う可能性が残る）。
      */
-    fun extractTotalEpisodes(html: String, workUrl: String, site: Site): Int? {
-        val doc = Jsoup.parse(html, workUrl)
-        tocMaxEpisodeNumber(doc, workUrl, site)?.let { return it }
+    fun extractTotalEpisodes(htmls: List<String>, workUrl: String, site: Site): Int? {
+        val maxFromLinks = htmls.mapNotNull { html ->
+            tocMaxEpisodeNumber(Jsoup.parse(html, workUrl), workUrl, site)
+        }.maxOrNull()
+        if (maxFromLinks != null) return maxFromLinks
 
-        val text = doc.text()
+        val text = Jsoup.parse(htmls.first(), workUrl).text()
         val patterns = when (site) {
             Site.NAROU -> listOf(Regex("全\\s*(\\d+)\\s*エピソード"), Regex("全\\s*(\\d+)\\s*話"))
             Site.KAKUYOMU -> listOf(Regex("全\\s*(\\d+)\\s*話"), Regex("全\\s*(\\d+)\\s*エピソード"))
@@ -85,6 +94,21 @@ object NovelScraper {
             if (m != null) return m.groupValues[1].toIntOrNull()
         }
         return null
+    }
+
+    /**
+     * なろうの目次ページに「次へ」のようなページネーションリンクがあれば、その絶対URLを返す。
+     * 長編（100話区切り等）は目次が複数ページに分かれるため、総話数・章立て情報を
+     * 正しく取得するには全ページを辿って集計する必要がある。
+     */
+    fun findNextTocPageUrl(html: String, currentUrl: String, site: Site): String? {
+        if (site != Site.NAROU) return null // カクヨムは目次が1ページに収まる設計のため対象外
+        val doc = Jsoup.parse(html, currentUrl)
+        return doc.select("a[href]").firstOrNull { a ->
+            val text = a.text()
+            (text.contains("次へ") || text.contains("次の") || text.contains("Next")) &&
+                Regex("[?&]p=\\d+").containsMatchIn(a.attr("abs:href"))
+        }?.attr("abs:href")
     }
 
     /** ページ内にある「この作品自身」のエピソードリンクの中で最大の話数を返す（なろうのみ対応） */
@@ -123,6 +147,11 @@ object NovelScraper {
         return doc.select("a[href]").any { pattern.containsMatchIn(it.attr("abs:href")) }
     }
 
+    /** 単一ページ版（後方互換用）。目次が複数ページに分かれている作品は途中の章が抜けるため、
+     *  可能な場合は目次の全ページを渡す [parseChapterMap] (List版) を使うこと。 */
+    fun parseChapterMap(html: String, workUrl: String, site: Site): Map<String, String> =
+        parseChapterMap(listOf(html), workUrl, site)
+
     /**
      * 作品ページ（TOC）から章立て情報を読み取る。
      * 「序章」「地位向上編」等の見出し要素と、そのすぐ後に続くエピソードへのリンクを
@@ -132,33 +161,36 @@ object NovelScraper {
      * サイト側のデザイン変更にもある程度耐性がある。
      * 戻り値のキーは、なろうは話数（"1","2",…）、カクヨムはエピソードURL（正規化済み）。
      * 章が判定できないエピソードはマップに含まれない（呼び出し側でnull扱いにする）。
+     * 長編は目次が「次へ」で複数ページに分かれるため、htmlsには[findNextTocPageUrl]で
+     * 辿った全ページを渡す必要がある。
      */
-    fun parseChapterMap(html: String, workUrl: String, site: Site): Map<String, String> {
+    fun parseChapterMap(htmls: List<String>, workUrl: String, site: Site): Map<String, String> {
         if (site == Site.UNKNOWN) return emptyMap()
-        val doc = Jsoup.parse(html, workUrl)
-        // 自分の作品自身のエピソードリンクだけに絞る（おすすめ作品等の無関係なリンクを除外するため）
         val episodeUrlPattern = episodeUrlPatternForWork(workUrl, site) ?: return emptyMap()
 
         val result = LinkedHashMap<String, String>()
-        var currentChapter: String? = null
+        for (html in htmls) {
+            val doc = Jsoup.parse(html, workUrl)
+            var currentChapter: String? = null
 
-        for (el in doc.select("*")) {
-            val isHeading = el.className().contains("chapter", ignoreCase = true) &&
-                el.select("a[href]").isEmpty()
-            if (isHeading) {
-                val text = el.text().trim()
-                if (text.isNotEmpty() && text.length <= 60) currentChapter = text
-                continue
-            }
-            if (el.tagName() == "a" && el.hasAttr("href")) {
-                val chapter = currentChapter ?: continue
-                val href = el.attr("abs:href")
-                if (!episodeUrlPattern.containsMatchIn(href)) continue
-                val key = when (site) {
-                    Site.NAROU -> episodeUrlPattern.find(href)!!.groupValues[1]
-                    else -> normalizeEpisodeKey(href)
+            for (el in doc.select("*")) {
+                val isHeading = el.className().contains("chapter", ignoreCase = true) &&
+                    el.select("a[href]").isEmpty()
+                if (isHeading) {
+                    val text = el.text().trim()
+                    if (text.isNotEmpty() && text.length <= 60) currentChapter = text
+                    continue
                 }
-                result.putIfAbsent(key, chapter)
+                if (el.tagName() == "a" && el.hasAttr("href")) {
+                    val chapter = currentChapter ?: continue
+                    val href = el.attr("abs:href")
+                    if (!episodeUrlPattern.containsMatchIn(href)) continue
+                    val key = when (site) {
+                        Site.NAROU -> episodeUrlPattern.find(href)!!.groupValues[1]
+                        else -> normalizeEpisodeKey(href)
+                    }
+                    result.putIfAbsent(key, chapter)
+                }
             }
         }
         return result
