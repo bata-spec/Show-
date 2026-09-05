@@ -41,7 +41,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
         novel: Novel
     ) {
         val workHtml = NetworkClient.fetchHtml(novel.sourceUrl)
-        if (NetworkClient.looksLikeAgeGate(workHtml)) return
+        if (NetworkClient.looksLikeAgeGate(workHtml, novel.sourceUrl, novel.site)) return
 
         val existingEpisodes = storage.loadEpisodes(novel.id)
         val existingCount = existingEpisodes.count { it.downloaded }

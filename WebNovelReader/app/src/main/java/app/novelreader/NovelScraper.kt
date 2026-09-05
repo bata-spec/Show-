@@ -110,6 +110,20 @@ object NovelScraper {
     }
 
     /**
+     * ページ内に、この作品自身のエピソードへのリンクが実在するかどうかを調べる。
+     * 年齢確認を本当に突破できていれば、作品ページには必ず自分のエピソードへの
+     * リンクが含まれるはずなので、これが見つかった時点で「年齢確認ページではなく
+     * 本物のページが返ってきている」と判断できる
+     * （R18作品の本物のページにも「R18」「18歳以上」等の注意書きが含まれることがあり、
+     * それだけでは年齢確認ページと本物のページを区別できないため）。
+     */
+    fun pageHasWorkEpisodeLinks(html: String, workUrl: String, site: Site): Boolean {
+        val pattern = episodeUrlPatternForWork(workUrl, site) ?: return false
+        val doc = Jsoup.parse(html, workUrl)
+        return doc.select("a[href]").any { pattern.containsMatchIn(it.attr("abs:href")) }
+    }
+
+    /**
      * 作品ページ（TOC）から章立て情報を読み取る。
      * 「序章」「地位向上編」等の見出し要素と、そのすぐ後に続くエピソードへのリンクを
      * ドキュメント順に走査して対応付ける。見出しのクラス名は"chapter"を含むもの

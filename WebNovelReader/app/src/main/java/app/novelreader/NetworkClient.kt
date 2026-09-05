@@ -131,10 +131,22 @@ object NetworkClient {
         }
     }
 
-    /** 取得したHTMLが年齢確認ページっぽいかどうかの簡易判定 */
-    fun looksLikeAgeGate(html: String): Boolean {
+    /**
+     * 取得したHTMLが年齢確認ページっぽいかどうかの簡易判定。
+     * workUrl/siteが分かる場合は、その作品自身のエピソードへのリンクが実在するかを
+     * 先にチェックする。R18作品の本物のページにも「R18」「18歳以上」等の文言が
+     * 含まれることがあり、キーワードの有無だけでは年齢確認ページと本物のページを
+     * 区別できないため（本物のページなら必ずエピソードへのリンクがあるはず）。
+     */
+    fun looksLikeAgeGate(html: String, workUrl: String? = null, site: Site = Site.UNKNOWN): Boolean {
         val keywords = listOf("年齢確認", "18歳未満", "18歳以上", "age verification", "R18", "age-check")
         val hitCount = keywords.count { html.contains(it, ignoreCase = true) }
-        return hitCount > 0 && html.length < 20000
+        if (hitCount == 0) return false
+
+        if (workUrl != null && NovelScraper.pageHasWorkEpisodeLinks(html, workUrl, site)) {
+            return false
+        }
+
+        return html.length < 20000
     }
 }

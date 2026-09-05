@@ -13,7 +13,24 @@ android {
         versionName "1.0"
     }
 
+    signingConfigs {
+        debug {
+            // 環境ごとに自動生成される既定のdebug鍵ではなく、リポジトリに含まれる固定の鍵を使う。
+            // これによりTermuxでのビルドとGitHub Actionsでのビルドが常に同じ署名になり、
+            // アップデート時にアンインストールしなくても上書きインストールできる
+            // （署名が変わるたびにアンインストールが必要になり、年齢確認Cookie等の
+            // アプリ内保存データが毎回消えてしまう問題を避けるため）。
+            storeFile file("../debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
         }

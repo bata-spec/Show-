@@ -37,7 +37,7 @@ class DownloadManager(private val storage: Storage) {
             return
         }
 
-        if (NetworkClient.looksLikeAgeGate(workHtml)) {
+        if (NetworkClient.looksLikeAgeGate(workHtml, url, site)) {
             onProgress(
                 Progress.Failed(
                     "年齢確認ページが表示されました。メイン画面の「年齢確認が必要なサイトを開く」から" +
