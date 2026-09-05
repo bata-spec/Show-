@@ -101,6 +101,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         observeProgress()
+        observePendingQueue()
         handleIncomingIntent(intent)
         refreshList()
     }
@@ -143,6 +144,9 @@ class MainActivity : AppCompatActivity() {
         }
         statusText.text = "取得中…（通知バーにも進捗が出ます）"
         DownloadService.enqueueMultiple(applicationContext, listOf(url))
+        // 他の作品をダウンロード中だと、次にこの取得が始まるまでstatusTextがすぐ上書きされてしまい
+        // 「反応が無い」ように見えるため、キューに積んだこと自体をToastでもはっきり伝える
+        Toast.makeText(this, "キューに追加しました。順番にダウンロードされます", Toast.LENGTH_SHORT).show()
     }
 
     /** 上から1件ずつ、総話数確認→保存という流れを全作品分キューに積む（既存の直列キューに乗せるだけ） */
@@ -341,6 +345,12 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun observePendingQueue() {
+        lifecycleScope.launch {
+            DownloadBus.pendingUrls.collect { refreshList() }
+        }
+    }
+
     private fun observeProgress() {
         lifecycleScope.launch {
             DownloadBus.events.collect { event ->
@@ -371,7 +381,7 @@ class MainActivity : AppCompatActivity() {
         val novels = storage.loadLibrary()
         val folders = storage.loadFolders()
         val episodeCounts = novels.associate { it.id to storage.loadEpisodes(it.id).count { ep -> ep.downloaded } }
-        adapter.submit(novels, folders, episodeCounts)
+        adapter.submit(novels, folders, episodeCounts, DownloadBus.pendingUrls.value)
     }
 
     override fun onResume() {

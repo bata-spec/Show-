@@ -40,6 +40,8 @@ class DownloadService : Service() {
             }
             if (urlList.isEmpty()) return
 
+            urlList.forEach { DownloadBus.addPending(it) }
+
             val intent = Intent(context, DownloadService::class.java)
             intent.putStringArrayListExtra("novelIds", novelIds)
             intent.putStringArrayListExtra("urls", urlList)
@@ -94,6 +96,7 @@ class DownloadService : Service() {
     private suspend fun processQueue(startId: Int) {
         while (queue.isNotEmpty()) {
             val (novelId, url) = queue.removeFirst()
+            DownloadBus.removePending(url)
             var lastTitle = novelId
 
             try {
