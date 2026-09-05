@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="12dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="小説リーダー"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:paddingBottom="8dp" />
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <EditText
+            android:id="@+id/editUrl"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="カクヨム・なろうのURLを貼り付け"
+            android:inputType="textUri" />
+
+        <Button
+            android:id="@+id/btnAdd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="追加" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#3366CC"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp" />
+
+    <Button
+        android:id="@+id/btnScreenshot"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="URLをフルページスクショ保存" />
+
+    <Button
+        android:id="@+id/btnAgeGate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="年齢確認が必要なサイトを開く" />
+
+    <Button
+        android:id="@+id/btnBatchAdd"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="複数URLをまとめて追加" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="保存済みの作品（タップで話一覧・長押しで削除）"
+        android:paddingTop="8dp"
+        android:paddingBottom="4dp" />
+
+    <ListView
+        android:id="@+id/listNovels"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+</LinearLayout>

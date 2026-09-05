@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="12dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:paddingBottom="4dp"
+        android:text="複数URLをまとめて追加" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="8dp"
+        android:text="1行に1つずつURLを貼り付けてください。順番にダウンロードされます（同時並行ではありません）。" />
+
+    <EditText
+        android:id="@+id/editBatchUrls"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="top|start"
+        android:inputType="textMultiLine"
+        android:hint="https://kakuyomu.jp/works/...&#10;https://ncode.syosetu.com/..." />
+
+    <Button
+        android:id="@+id/btnBatchStart"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="キューに追加してダウンロード開始" />
+
+</LinearLayout>

@@ -1,0 +1,2 @@
+rootProject.name = "WebNovelReader"
+include ':app'
