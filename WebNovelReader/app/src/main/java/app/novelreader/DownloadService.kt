@@ -10,16 +10,18 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.EnumMap
 
 /**
  * 通知バーに進捗を表示しながらダウンロードを行うフォアグラウンドサービス。
- * 複数URLをまとめて渡すと、内部キューに積んで1件ずつ順番に処理する
- * （サイトへの同時多重アクセスを避けるため、並列ではなく直列で処理する）。
+ * サイト（なろう／カクヨム）ごとに別々のキューを持ち、同じサイト内は1件ずつ順番に処理する
+ * （そのサイトへの同時多重アクセスを避けるため）。一方、別サイト同士は互いのレート制限に
+ * 影響しないため、並列にダウンロードして待ち時間を減らす。
  */
 class DownloadService : Service() {
 
     companion object {
-        private const val NOTIF_PROGRESS_ID = 1001
+        private const val NOTIF_PROGRESS_ID_BASE = 1001
         private const val NOTIF_RESULT_BASE = 2_000_000
 
         /** 1件だけダウンロード（既存の呼び出し元との互換用） */
@@ -58,8 +60,10 @@ class DownloadService : Service() {
     private lateinit var downloadManager: DownloadManager
     private lateinit var notificationManager: NotificationManager
 
-    private val queue = ArrayDeque<Pair<String, String>>() // novelId to url
-    private var isProcessing = false
+    private val lock = Any()
+    private val queues = EnumMap<Site, ArrayDeque<Pair<String, String>>>(Site::class.java) // novelId to url
+    private val activeSites = mutableSetOf<Site>()
+    private var activeWorkerCount = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -75,27 +79,51 @@ class DownloadService : Service() {
         val urls = intent?.getStringArrayListExtra("urls")
 
         if (novelIds == null || urls == null || novelIds.size != urls.size || novelIds.isEmpty()) {
-            if (!isProcessing) stopSelf()
+            if (activeWorkerCount == 0) stopSelf()
             return START_NOT_STICKY
         }
 
-        for (i in novelIds.indices) {
-            queue.addLast(novelIds[i] to urls[i])
+        val sitesToStart = mutableSetOf<Site>()
+        synchronized(lock) {
+            for (i in novelIds.indices) {
+                val site = detectSite(urls[i])
+                if (site == Site.UNKNOWN) continue
+                queues.getOrPut(site) { ArrayDeque() }.addLast(novelIds[i] to urls[i])
+                if (activeSites.add(site)) {
+                    activeWorkerCount++
+                    sitesToStart.add(site)
+                }
+            }
         }
 
-        startForeground(NOTIF_PROGRESS_ID, NotificationHelper.progressBuilder(this, "ダウンロード準備中…").build())
-        if (!isProcessing) {
-            isProcessing = true
+        startForeground(NOTIF_PROGRESS_ID_BASE, NotificationHelper.progressBuilder(this, "ダウンロード準備中…").build())
+
+        if (sitesToStart.isNotEmpty()) {
             DownloadBus.setRunning(true)
-            scope.launch { processQueue(startId) }
+        }
+        sitesToStart.forEach { site ->
+            scope.launch { processSiteQueue(site, startId) }
         }
 
         return START_NOT_STICKY
     }
 
-    private suspend fun processQueue(startId: Int) {
-        while (queue.isNotEmpty()) {
-            val (novelId, url) = queue.removeFirst()
+    /** 1つのサイトのキューを、そのサイト内では1件ずつ順番に処理し続けるワーカー */
+    private suspend fun processSiteQueue(site: Site, startId: Int) {
+        while (true) {
+            // キューが空だった場合の「自分をactiveSitesから外す」までを同じロックの中で行うことで、
+            // ちょうどそのタイミングで新しいURLが追加された場合でも取りこぼさないようにする
+            // （空チェックと離脱がアトミックでないと、新規ワーカーが起動されないまま
+            // 追加分だけキューに取り残されてしまうことがある）。
+            val next = synchronized(lock) {
+                val item = queues[site]?.removeFirstOrNull()
+                if (item == null) {
+                    activeSites.remove(site)
+                    activeWorkerCount--
+                }
+                item
+            } ?: break
+            val (novelId, url) = next
             DownloadBus.removePending(url)
             var lastTitle = novelId
 
@@ -105,11 +133,11 @@ class DownloadService : Service() {
                     when (progress) {
                         is DownloadManager.Progress.Started -> {
                             lastTitle = progress.title
-                            updateProgressNotification(progress)
+                            updateProgressNotification(site, progress)
                         }
                         is DownloadManager.Progress.EpisodeSaved -> {
                             lastTitle = progress.title
-                            updateProgressNotification(progress)
+                            updateProgressNotification(site, progress)
                         }
                         is DownloadManager.Progress.Finished -> {
                             postResultNotification(novelId, lastTitle, "完了：${progress.totalEpisodes}話を保存しました")
@@ -122,27 +150,22 @@ class DownloadService : Service() {
             } catch (e: Exception) {
                 postResultNotification(novelId, lastTitle, "予期しないエラー: ${e.message}")
             }
-
-            if (queue.isNotEmpty()) {
-                notificationManager.notify(
-                    NOTIF_PROGRESS_ID,
-                    NotificationHelper.progressBuilder(this, "次の作品を準備中…（残り${queue.size}件）").build()
-                )
-            }
         }
 
-        isProcessing = false
-        DownloadBus.setRunning(false)
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf(startId)
+        val anyStillRunning = synchronized(lock) { activeWorkerCount > 0 }
+        if (!anyStillRunning) {
+            DownloadBus.setRunning(false)
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf(startId)
+        }
     }
 
-    private fun updateProgressNotification(progress: DownloadManager.Progress) {
+    private fun updateProgressNotification(site: Site, progress: DownloadManager.Progress) {
         val text = when (progress) {
             is DownloadManager.Progress.Started ->
-                "「${progress.title}」を確認中…" + (progress.total?.let { "（全${it}話）" } ?: "")
+                "[${site.name}] 「${progress.title}」を確認中…" + (progress.total?.let { "（全${it}話）" } ?: "")
             is DownloadManager.Progress.EpisodeSaved ->
-                if (progress.total != null) {
+                "[${site.name}] " + if (progress.total != null) {
                     "${progress.order}/${progress.total}話「${progress.title}」"
                 } else {
                     "第${progress.order}話「${progress.title}」"
@@ -153,7 +176,8 @@ class DownloadService : Service() {
         if (progress is DownloadManager.Progress.EpisodeSaved && progress.total != null) {
             builder.setProgress(progress.total, progress.order, false)
         }
-        notificationManager.notify(NOTIF_PROGRESS_ID, builder.build())
+        // サイトごとに別の通知にすることで、並列ダウンロード中でも進捗表示が互いを上書きしない
+        notificationManager.notify(NOTIF_PROGRESS_ID_BASE + site.ordinal, builder.build())
     }
 
     private fun postResultNotification(novelId: String, title: String, text: String) {
@@ -165,7 +189,10 @@ class DownloadService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        isProcessing = false
+        synchronized(lock) {
+            activeSites.clear()
+            activeWorkerCount = 0
+        }
         DownloadBus.setRunning(false)
     }
 }
