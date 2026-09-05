@@ -139,7 +139,7 @@ class MainActivity : AppCompatActivity() {
         val url = UrlNormalizer.normalize(rawUrl)
         val site = detectSite(url)
         if (site == Site.UNKNOWN) {
-            Toast.makeText(this, "対応していないサイトです（カクヨム・なろうのみ対応）", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "対応していないサイトです（カクヨム・なろう・ハーメルンのみ対応）", Toast.LENGTH_LONG).show()
             return
         }
         statusText.text = "取得中…（通知バーにも進捗が出ます）"

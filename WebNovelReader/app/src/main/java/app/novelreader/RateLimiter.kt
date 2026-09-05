@@ -13,7 +13,9 @@ object RateLimiter {
     private val intervalMsByHost = mapOf(
         "kakuyomu.jp" to 2200L,
         "ncode.syosetu.com" to 1300L,
-        "novel18.syosetu.com" to 1300L
+        "novel18.syosetu.com" to 1300L,
+        // ハーメルンは個人運営に近い比較的小規模なサイトのため、他サイトより余裕を持った間隔にする
+        "syosetu.org" to 2500L
     )
     private const val DEFAULT_INTERVAL_MS = 2000L
 

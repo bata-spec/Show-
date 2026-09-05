@@ -23,6 +23,7 @@ object NovelScraper {
         return when (site) {
             Site.KAKUYOMU -> Regex("works/(\\d+)").find(url)?.groupValues?.get(1) ?: url.hashCode().toString()
             Site.NAROU -> Regex("syosetu\\.com/([a-zA-Z0-9]+)").find(url)?.groupValues?.get(1) ?: url.hashCode().toString()
+            Site.HAMELN -> Regex("syosetu\\.org/novel/(\\d+)").find(url)?.groupValues?.get(1) ?: url.hashCode().toString()
             Site.UNKNOWN -> url.hashCode().toString()
         }
     }
@@ -49,6 +50,10 @@ object NovelScraper {
             Site.NAROU -> {
                 val ncode = extractWorkId(workUrl, site)
                 "https://${extractNarouHost(workUrl)}/$ncode/1/"
+            }
+            Site.HAMELN -> {
+                val id = extractWorkId(workUrl, site)
+                "https://syosetu.org/novel/$id/1.html"
             }
             Site.UNKNOWN -> null
         }
@@ -87,6 +92,7 @@ object NovelScraper {
         val patterns = when (site) {
             Site.NAROU -> listOf(Regex("全\\s*(\\d+)\\s*エピソード"), Regex("全\\s*(\\d+)\\s*話"))
             Site.KAKUYOMU -> listOf(Regex("全\\s*(\\d+)\\s*話"), Regex("全\\s*(\\d+)\\s*エピソード"))
+            Site.HAMELN -> listOf(Regex("全\\s*(\\d+)\\s*話"))
             Site.UNKNOWN -> emptyList()
         }
         for (p in patterns) {
@@ -102,7 +108,7 @@ object NovelScraper {
      * 正しく取得するには全ページを辿って集計する必要がある。
      */
     fun findNextTocPageUrl(html: String, currentUrl: String, site: Site): String? {
-        if (site != Site.NAROU) return null // カクヨムは目次が1ページに収まる設計のため対象外
+        if (site != Site.NAROU) return null // カクヨム・ハーメルンは目次が1ページに収まる設計のため対象外
         val doc = Jsoup.parse(html, currentUrl)
         return doc.select("a[href]").firstOrNull { a ->
             val text = a.text()
@@ -111,9 +117,9 @@ object NovelScraper {
         }?.attr("abs:href")
     }
 
-    /** ページ内にある「この作品自身」のエピソードリンクの中で最大の話数を返す（なろうのみ対応） */
+    /** ページ内にある「この作品自身」のエピソードリンクの中で最大の話数を返す（なろう・ハーメルン対応） */
     private fun tocMaxEpisodeNumber(doc: Document, workUrl: String, site: Site): Int? {
-        if (site != Site.NAROU) return null
+        if (site != Site.NAROU && site != Site.HAMELN) return null
         val pattern = episodeUrlPatternForWork(workUrl, site) ?: return null
         return doc.select("a[href]")
             .mapNotNull { pattern.find(it.attr("abs:href"))?.groupValues?.get(1)?.toIntOrNull() }
@@ -129,6 +135,7 @@ object NovelScraper {
         return when (site) {
             Site.NAROU -> Regex("syosetu\\.com/${Regex.escape(id)}/(\\d+)/?(?:[?#].*)?$")
             Site.KAKUYOMU -> Regex("/works/${Regex.escape(id)}/episodes/\\d+/?$")
+            Site.HAMELN -> Regex("syosetu\\.org/novel/${Regex.escape(id)}/(\\d+)\\.html")
             Site.UNKNOWN -> null
         }
     }
@@ -228,6 +235,15 @@ object NovelScraper {
                     val ncode = m.groupValues[1]
                     val num = m.groupValues[2].toInt()
                     "https://${extractNarouHost(currentUrl)}/$ncode/${num + 1}/"
+                } else null
+            }
+            Site.HAMELN -> {
+                // ハーメルンはURLが /novel/{id}/番号.html という連番構成なので次の番号を機械的に組み立てる
+                val m = Regex("syosetu\\.org/novel/(\\d+)/(\\d+)\\.html").find(currentUrl)
+                if (m != null) {
+                    val id = m.groupValues[1]
+                    val num = m.groupValues[2].toInt()
+                    "https://syosetu.org/novel/$id/${num + 1}.html"
                 } else null
             }
             Site.UNKNOWN -> null

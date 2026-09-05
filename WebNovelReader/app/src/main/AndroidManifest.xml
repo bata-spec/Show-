@@ -37,6 +37,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="kakuyomu.jp" />
                 <data android:scheme="https" android:host="ncode.syosetu.com" />
+                <data android:scheme="https" android:host="syosetu.org" />
             </intent-filter>
         </activity>
 

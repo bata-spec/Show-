@@ -27,6 +27,7 @@ data class NovelFolder(
 enum class Site {
     KAKUYOMU,
     NAROU,
+    HAMELN,
     UNKNOWN
 }
 
@@ -34,6 +35,7 @@ fun detectSite(url: String): Site {
     return when {
         url.contains("kakuyomu.jp") -> Site.KAKUYOMU
         url.contains("syosetu.com") -> Site.NAROU
+        url.contains("syosetu.org") -> Site.HAMELN
         else -> Site.UNKNOWN
     }
 }

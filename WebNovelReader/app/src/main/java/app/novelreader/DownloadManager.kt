@@ -24,7 +24,7 @@ class DownloadManager(private val storage: Storage) {
         val url = UrlNormalizer.normalize(rawUrl)
         val site = detectSite(url)
         if (site == Site.UNKNOWN) {
-            onProgress(Progress.Failed("対応していないサイトです（カクヨム・なろうのみ対応）"))
+            onProgress(Progress.Failed("対応していないサイトです（カクヨム・なろう・ハーメルンのみ対応）"))
             return
         }
 
