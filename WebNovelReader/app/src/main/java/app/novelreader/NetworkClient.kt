@@ -84,6 +84,12 @@ object NetworkClient {
             try {
                 return fetchOnce(url, referer)
             } catch (e: Exception) {
+                if (e is HttpException && e.code == 404) {
+                    // 404（ページが存在しない＝欠番）はリトライしても結果が変わらないため、
+                    // 待機せず即座にあきらめる。なろうの欠番スキップ判定がこれに依存しており、
+                    // ここでリトライしていると欠番1件につき最大7.5秒×3回アクセス分無駄に待たされる。
+                    throw e
+                }
                 lastError = e
                 if (attempt < maxRetries) {
                     // 失敗のたびに待機時間を伸ばす（1回目失敗→2.5秒、2回目失敗→5秒 など）
