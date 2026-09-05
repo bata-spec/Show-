@@ -8,6 +8,7 @@ import java.io.File
 class Storage(private val context: Context) {
 
     private val libraryFile = File(context.filesDir, "library.json")
+    private val foldersFile = File(context.filesDir, "folders.json")
 
     private fun novelDir(novelId: String): File =
         File(context.filesDir, "novels/$novelId").apply { mkdirs() }
@@ -32,16 +33,15 @@ class Storage(private val context: Context) {
                     title = o.getString("title"),
                     sourceUrl = o.getString("sourceUrl"),
                     site = Site.valueOf(o.optString("site", "UNKNOWN")),
-                    addedAt = o.optLong("addedAt", System.currentTimeMillis())
+                    addedAt = o.optLong("addedAt", System.currentTimeMillis()),
+                    folderId = o.optString("folderId", "").ifBlank { null }
                 )
             )
         }
         return list.sortedByDescending { it.addedAt }
     }
 
-    fun upsertNovel(novel: Novel) {
-        val list = loadLibrary().filter { it.id != novel.id }.toMutableList()
-        list.add(novel)
+    private fun writeLibrary(list: List<Novel>) {
         val arr = JSONArray()
         list.forEach { n ->
             arr.put(
@@ -51,28 +51,79 @@ class Storage(private val context: Context) {
                     put("sourceUrl", n.sourceUrl)
                     put("site", n.site.name)
                     put("addedAt", n.addedAt)
+                    put("folderId", n.folderId ?: "")
                 }
             )
         }
         libraryFile.writeText(arr.toString())
     }
 
+    fun upsertNovel(novel: Novel) {
+        val existing = loadLibrary().firstOrNull { it.id == novel.id }
+        // フォルダ分けは巡回ダウンロード等の再登録で失われないよう既存の値を引き継ぐ
+        val toSave = if (existing != null && novel.folderId == null) novel.copy(folderId = existing.folderId) else novel
+        val list = loadLibrary().filter { it.id != novel.id }.toMutableList()
+        list.add(toSave)
+        writeLibrary(list)
+    }
+
     fun deleteNovel(novelId: String) {
-        val list = loadLibrary().filter { it.id != novelId }
+        writeLibrary(loadLibrary().filter { it.id != novelId })
+        novelDir(novelId).deleteRecursively()
+    }
+
+    fun moveNovelToFolder(novelId: String, folderId: String?) {
+        val list = loadLibrary().map { if (it.id == novelId) it.copy(folderId = folderId) else it }
+        writeLibrary(list)
+    }
+
+    // ---------- フォルダ ----------
+
+    fun loadFolders(): List<NovelFolder> {
+        if (!foldersFile.exists()) return emptyList()
+        val arr = JSONArray(foldersFile.readText())
+        val list = mutableListOf<NovelFolder>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            list.add(
+                NovelFolder(
+                    id = o.getString("id"),
+                    name = o.getString("name"),
+                    createdAt = o.optLong("createdAt", System.currentTimeMillis())
+                )
+            )
+        }
+        return list.sortedBy { it.createdAt }
+    }
+
+    private fun writeFolders(list: List<NovelFolder>) {
         val arr = JSONArray()
-        list.forEach { n ->
+        list.forEach { f ->
             arr.put(
                 JSONObject().apply {
-                    put("id", n.id)
-                    put("title", n.title)
-                    put("sourceUrl", n.sourceUrl)
-                    put("site", n.site.name)
-                    put("addedAt", n.addedAt)
+                    put("id", f.id)
+                    put("name", f.name)
+                    put("createdAt", f.createdAt)
                 }
             )
         }
-        libraryFile.writeText(arr.toString())
-        novelDir(novelId).deleteRecursively()
+        foldersFile.writeText(arr.toString())
+    }
+
+    fun createFolder(name: String): NovelFolder {
+        val folder = NovelFolder(id = "folder_${System.currentTimeMillis()}", name = name, createdAt = System.currentTimeMillis())
+        writeFolders(loadFolders() + folder)
+        return folder
+    }
+
+    fun renameFolder(folderId: String, newName: String) {
+        writeFolders(loadFolders().map { if (it.id == folderId) it.copy(name = newName) else it })
+    }
+
+    fun deleteFolder(folderId: String) {
+        writeFolders(loadFolders().filter { it.id != folderId })
+        // フォルダに属していた作品は未分類に戻す
+        writeLibrary(loadLibrary().map { if (it.folderId == folderId) it.copy(folderId = null) else it })
     }
 
     // ---------- 話数リスト ----------
@@ -90,7 +141,8 @@ class Storage(private val context: Context) {
                     title = o.getString("title"),
                     url = o.getString("url"),
                     order = o.getInt("order"),
-                    downloaded = o.optBoolean("downloaded", false)
+                    downloaded = o.optBoolean("downloaded", false),
+                    chapterName = o.optString("chapterName", "").ifBlank { null }
                 )
             )
         }
@@ -107,6 +159,7 @@ class Storage(private val context: Context) {
                     put("url", e.url)
                     put("order", e.order)
                     put("downloaded", e.downloaded)
+                    put("chapterName", e.chapterName ?: "")
                 }
             )
         }

@@ -5,7 +5,8 @@ data class Novel(
     val title: String,
     val sourceUrl: String,
     val site: Site,
-    val addedAt: Long
+    val addedAt: Long,
+    val folderId: String? = null
 )
 
 data class Episode(
@@ -13,7 +14,14 @@ data class Episode(
     val title: String,
     val url: String,
     val order: Int,
-    var downloaded: Boolean = false
+    var downloaded: Boolean = false,
+    val chapterName: String? = null // 章立てグルーピング用（不明な場合はnull）
+)
+
+data class NovelFolder(
+    val id: String,
+    val name: String,
+    val createdAt: Long
 )
 
 enum class Site {

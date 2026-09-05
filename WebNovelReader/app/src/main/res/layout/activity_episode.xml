@@ -29,7 +29,7 @@
         android:id="@+id/statusText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="#3366CC" />
+        android:textColor="@color/app_accent" />
 
     <ListView
         android:id="@+id/listEpisodes"

@@ -71,6 +71,53 @@ object NovelScraper {
         return null
     }
 
+    /**
+     * 作品ページ（TOC）から章立て情報を読み取る。
+     * 「序章」「地位向上編」等の見出し要素と、そのすぐ後に続くエピソードへのリンクを
+     * ドキュメント順に走査して対応付ける。見出しのクラス名は"chapter"を含むもの
+     * （なろう旧デザインのchapter_title、新デザインのp-eplist__chapter-title、
+     * カクヨムのwidget-toc-chapter-title等）をヒューリスティックに拾う方式のため、
+     * サイト側のデザイン変更にもある程度耐性がある。
+     * 戻り値のキーは、なろうは話数（"1","2",…）、カクヨムはエピソードURL（正規化済み）。
+     * 章が判定できないエピソードはマップに含まれない（呼び出し側でnull扱いにする）。
+     */
+    fun parseChapterMap(html: String, workUrl: String, site: Site): Map<String, String> {
+        if (site == Site.UNKNOWN) return emptyMap()
+        val doc = Jsoup.parse(html, workUrl)
+        val episodeUrlPattern = when (site) {
+            Site.NAROU -> Regex("syosetu\\.com/[a-zA-Z0-9]+/(\\d+)/?(?:[?#].*)?$")
+            Site.KAKUYOMU -> Regex("/works/\\d+/episodes/\\d+/?$")
+            Site.UNKNOWN -> return emptyMap()
+        }
+
+        val result = LinkedHashMap<String, String>()
+        var currentChapter: String? = null
+
+        for (el in doc.select("*")) {
+            val isHeading = el.className().contains("chapter", ignoreCase = true) &&
+                el.select("a[href]").isEmpty()
+            if (isHeading) {
+                val text = el.text().trim()
+                if (text.isNotEmpty() && text.length <= 60) currentChapter = text
+                continue
+            }
+            if (el.tagName() == "a" && el.hasAttr("href")) {
+                val chapter = currentChapter ?: continue
+                val href = el.attr("abs:href")
+                if (!episodeUrlPattern.containsMatchIn(href)) continue
+                val key = when (site) {
+                    Site.NAROU -> episodeUrlPattern.find(href)!!.groupValues[1]
+                    else -> normalizeEpisodeKey(href)
+                }
+                result.putIfAbsent(key, chapter)
+            }
+        }
+        return result
+    }
+
+    /** チャプターマップのキーとURLの表記ゆれ（末尾スラッシュ・クエリ）を揃えるための正規化 */
+    fun normalizeEpisodeKey(url: String): String = url.substringBefore("?").trimEnd('/')
+
     /** <title>タグから " - サイト名" 等を取り除いてざっくり見出しだけにする */
     private fun extractTitleFromHead(doc: Document): String {
         val raw = doc.title().ifBlank {

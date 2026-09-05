@@ -5,13 +5,92 @@
     android:layout_height="match_parent"
     android:padding="12dp">
 
-    <TextView
+    <LinearLayout
+        android:id="@+id/titleRow"
+        android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="小説リーダー"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:paddingBottom="8dp" />
+        android:gravity="center_vertical"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="小説リーダー"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnUpdateAll"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:textSize="12sp"
+            android:text="全小説を更新" />
+
+        <Button
+            android:id="@+id/btnMenu"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="4dp"
+            android:textSize="20sp"
+            android:text="⋮" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/selectionRow"
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:visibility="gone"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/textSelectionCount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnSelectionMove"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:textSize="12sp"
+            android:text="フォルダに移動" />
+
+        <Button
+            android:id="@+id/btnSelectionDelete"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:textSize="12sp"
+            android:text="削除" />
+
+        <Button
+            android:id="@+id/btnSelectionCancel"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:textSize="12sp"
+            android:text="キャンセル" />
+    </LinearLayout>
 
     <LinearLayout
         android:orientation="horizontal"
@@ -37,32 +116,14 @@
         android:id="@+id/statusText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="#3366CC"
+        android:textColor="@color/app_accent"
         android:paddingTop="4dp"
         android:paddingBottom="4dp" />
-
-    <Button
-        android:id="@+id/btnScreenshot"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="URLをフルページスクショ保存" />
-
-    <Button
-        android:id="@+id/btnAgeGate"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="年齢確認が必要なサイトを開く" />
-
-    <Button
-        android:id="@+id/btnBatchAdd"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="複数URLをまとめて追加" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="保存済みの作品（タップで話一覧・長押しで削除）"
+        android:text="保存済みの作品（タップで話一覧・長押しで複数選択→フォルダ移動／削除）"
         android:paddingTop="8dp"
         android:paddingBottom="4dp" />
 

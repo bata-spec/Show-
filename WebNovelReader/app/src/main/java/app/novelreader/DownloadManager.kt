@@ -49,6 +49,7 @@ class DownloadManager(private val storage: Storage) {
 
         val meta = NovelScraper.parseWorkMeta(workHtml, url, site)
         val totalEpisodes = NovelScraper.extractTotalEpisodes(workHtml, site)
+        val chapterMap = NovelScraper.parseChapterMap(workHtml, url, site)
         val novel = Novel(
             id = novelId,
             title = meta.title,
@@ -64,9 +65,9 @@ class DownloadManager(private val storage: Storage) {
         val savedCount = existing.count { it.downloaded }
 
         if (site == Site.NAROU && totalEpisodes != null) {
-            downloadNarouByNumber(novelId, url, startOrder, totalEpisodes, savedCount, onProgress)
+            downloadNarouByNumber(novelId, url, startOrder, totalEpisodes, savedCount, chapterMap, onProgress)
         } else {
-            downloadByFollowingLinks(novelId, site, meta, existing, startOrder, totalEpisodes, savedCount, onProgress)
+            downloadByFollowingLinks(novelId, site, meta, existing, startOrder, totalEpisodes, savedCount, chapterMap, onProgress)
         }
     }
 
@@ -77,6 +78,7 @@ class DownloadManager(private val storage: Storage) {
         startOrder: Int,
         totalEpisodes: Int,
         savedCountStart: Int,
+        chapterMap: Map<String, String>,
         onProgress: suspend (Progress) -> Unit
     ) {
         val ncode = NovelScraper.extractWorkId(workUrl, Site.NAROU)
@@ -110,7 +112,14 @@ class DownloadManager(private val storage: Storage) {
             storage.saveEpisodeText(novelId, epId, body)
             storage.appendEpisode(
                 novelId,
-                Episode(id = epId, title = epTitle, url = episodeUrl, order = order, downloaded = true)
+                Episode(
+                    id = epId,
+                    title = epTitle,
+                    url = episodeUrl,
+                    order = order,
+                    downloaded = true,
+                    chapterName = chapterMap[order.toString()]
+                )
             )
             savedCount++
             onProgress(Progress.EpisodeSaved(order, epTitle, totalEpisodes))
@@ -130,6 +139,7 @@ class DownloadManager(private val storage: Storage) {
         startOrder: Int,
         totalEpisodes: Int?,
         savedCountStart: Int,
+        chapterMap: Map<String, String>,
         onProgress: suspend (Progress) -> Unit
     ) {
         var order = startOrder
@@ -177,7 +187,14 @@ class DownloadManager(private val storage: Storage) {
                 storage.saveEpisodeText(novelId, epId, body)
                 storage.appendEpisode(
                     novelId,
-                    Episode(id = epId, title = epTitle, url = currentUrl, order = order, downloaded = true)
+                    Episode(
+                        id = epId,
+                        title = epTitle,
+                        url = currentUrl,
+                        order = order,
+                        downloaded = true,
+                        chapterName = chapterMap[NovelScraper.normalizeEpisodeKey(currentUrl)]
+                    )
                 )
                 savedCount++
                 onProgress(Progress.EpisodeSaved(order, epTitle, totalEpisodes))

@@ -2,7 +2,6 @@ package app.novelreader
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.ListView
 import android.widget.TextView
@@ -16,6 +15,7 @@ class EpisodeActivity : AppCompatActivity() {
     private lateinit var novelId: String
     private lateinit var listEpisodes: ListView
     private lateinit var statusText: TextView
+    private lateinit var adapter: EpisodeListAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,9 +30,11 @@ class EpisodeActivity : AppCompatActivity() {
 
         listEpisodes = findViewById(R.id.listEpisodes)
         statusText = findViewById(R.id.statusText)
+        adapter = EpisodeListAdapter(this)
+        listEpisodes.adapter = adapter
 
         listEpisodes.setOnItemClickListener { _, _, position, _ ->
-            val ep = storage.loadEpisodes(novelId).filter { it.downloaded }[position]
+            val ep = adapter.episodeAt(position) ?: return@setOnItemClickListener
             val intent = Intent(this, ReaderActivity::class.java)
             intent.putExtra("novelId", novelId)
             intent.putExtra("episodeId", ep.id)
@@ -101,10 +103,10 @@ class EpisodeActivity : AppCompatActivity() {
 
     private fun refreshList() {
         val episodes = storage.loadEpisodes(novelId).filter { it.downloaded }.sortedBy { it.order }
-        // サイト側のタイトルに既に話数（「01話」等）や章名が含まれていることが多いため、
-        // タイトルをそのまま表示する（「第1話」等をこちらで重ねて付けない）
-        val items = episodes.map { it.title }
-        listEpisodes.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, items)
+        // サイト側のタイトルに既に話数（「01話」等）が含まれていることが多いため、
+        // タイトルをそのまま表示する（「第1話」等をこちらで重ねて付けない）。
+        // 章立てが分かる場合はEpisodeListAdapter側で見出しを差し込んで表示する。
+        adapter.submitEpisodes(episodes)
     }
 
     override fun onResume() {

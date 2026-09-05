@@ -37,7 +37,7 @@
         android:id="@+id/statusTextShot"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="#3366CC"
+        android:textColor="@color/app_accent"
         android:paddingTop="4dp"
         android:paddingBottom="4dp" />
 

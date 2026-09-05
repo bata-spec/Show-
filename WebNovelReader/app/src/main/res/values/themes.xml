@@ -1,3 +1,16 @@
 <resources>
-    <style name="Theme.NovelReader" parent="Theme.MaterialComponents.DayNight.NoActionBar" />
+    <!--
+      端末のダークモード設定に関わらず、常に「白背景・黒文字」で表示する。
+      DayNightテーマだとダークモード時に配色が反転して見づらくなることがあるため、
+      Lightテーマを固定で使う。
+    -->
+    <style name="Theme.NovelReader" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">@color/app_background</item>
+        <item name="colorBackground">@color/app_background</item>
+        <item name="android:textColorPrimary">@color/app_text_primary</item>
+        <item name="android:textColorSecondary">@color/app_text_secondary</item>
+        <item name="android:textColor">@color/app_text_primary</item>
+        <item name="colorPrimary">@color/app_accent</item>
+        <item name="colorAccent">@color/app_accent</item>
+    </style>
 </resources>
